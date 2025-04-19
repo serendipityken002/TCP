@@ -2,6 +2,15 @@ import socket
 import os
 import struct
 import time
+import hashlib
+
+def calculate_md5(file_path):
+    """计算文件的 MD5 值"""
+    md5 = hashlib.md5()
+    with open(file_path, 'rb') as f:
+        while chunk := f.read(1024):
+            md5.update(chunk)
+    return md5.hexdigest()
 
 def send_data(file_path, server, checkpoint=0):
     fp = open(file_path, 'rb')
@@ -27,9 +36,22 @@ def send_file(server):
         server.send(filehead)
         print('文件头部信息发送成功')
         
+        # 获取断点位置
+        checkpoint = int(server.recv(8).decode('utf-8'))
+        print(f'服务器已接收 {checkpoint} 字节，继续传输')
+
         # 发送文件内容
-        send_data(vedio_path, server)
+        send_data(vedio_path, server, checkpoint)
         print('文件内容发送成功')
+
+        # 发送文件md5码
+        file_md5 = calculate_md5(vedio_path)
+        server.send(file_md5.encode('utf-8'))
+        print(f'文件 MD5 值发送成功：{file_md5}')
+
+        # 接收服务器回应，校验文件完整性
+        op = server.recv(128)
+        print(op)
 
 def main():
     # 定义服务器IP和端口

@@ -4,29 +4,38 @@ import threading
 import struct
 
 def handle_client(conn):
-    filehead = conn.recv(128 + 4)
-    filename, filesize = struct.unpack('128sl', filehead)
-    filename = filename.decode('utf-8')
-    print(f'文件名：{filename}，文件大小：{filesize}')
+    while True:
+        # 接收文件头
+        filehead = conn.recv(128 + 4)
+        filename, filesize = struct.unpack('128sl', filehead)
+        filename = filename.decode('utf-8')
+        print(f'文件名：{filename}，文件大小：{filesize}')
 
-    # 接收文件内容
-    filepath = f'download/{filename}'.strip('\x00')    
-    with open(filepath, 'wb') as fp:
-        received_size = 0
-        while received_size < filesize:
-            data = conn.recv(1024)
-            if not data:
-                break
-            fp.write(data)
-            received_size += len(data)
-            progress = 100 * received_size / filesize
-            print(f'\r文件接收中{progress:.2f}%', end='', flush=True)
-        
-    print()  # 换行，避免后续输出覆盖进度条
-    if received_size == filesize:
-        print(f'文件{filename}接收完成')
-    else:
-        print(f'文件{filename}接收失败，可能数据丢失')
+        # 判断是否需要断点续传
+        filepath = f'download/{filename}'.strip('\x00')  
+        checkoutpoint = 0
+        if os.path.exists(filepath):
+            checkoutpoint = os.path.getsize(filepath)
+        conn.send(str(checkoutpoint).encode('utf-8'))
+        print(f"已接收 {checkoutpoint} 字节，等待继续接收")
+
+        # 接收文件内容  
+        with open(filepath, 'ab') as fp:
+            received_size = checkoutpoint
+            while received_size < filesize:
+                data = conn.recv(1024)
+                if not data:
+                    break
+                fp.write(data)
+                received_size += len(data)
+                progress = 100 * received_size / filesize
+                print(f'\r文件接收中{progress:.2f}%', end='', flush=True)
+            
+        print()  # 换行，避免后续输出覆盖进度条
+        if received_size == filesize:
+            print(f'文件{filename}接收完成')
+        else:
+            print(f'文件{filename}接收失败，可能数据丢失')
 
 def main():
     ip = '127.0.0.1'
