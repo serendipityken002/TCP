@@ -2,6 +2,15 @@ import socket
 import os
 import threading
 import struct
+import hashlib
+
+def calculate_md5(file_path):
+    """计算文件的 MD5 值"""
+    md5 = hashlib.md5()
+    with open(file_path, 'rb') as f:
+        while chunk := f.read(1024):
+            md5.update(chunk)
+    return md5.hexdigest()
 
 def handle_client(conn):
     while True:
@@ -31,11 +40,17 @@ def handle_client(conn):
                 progress = 100 * received_size / filesize
                 print(f'\r文件接收中{progress:.2f}%', end='', flush=True)
             
+        # 校验文件完整性
         print()  # 换行，避免后续输出覆盖进度条
-        if received_size == filesize:
-            print(f'文件{filename}接收完成')
+        server_md5 = calculate_md5(filepath)
+        client_md5 = conn.recv(128).decode('utf-8')
+        if server_md5 == client_md5:
+            conn.send('true'.encode('utf-8'))
+            print('文件md5码校验成功')
         else:
-            print(f'文件{filename}接收失败，可能数据丢失')
+            conn.send('false'.encode('utf-8'))
+            print('文件md5码校验失败，将删除该文件')
+            os.remove(filepath)
 
 def main():
     ip = '127.0.0.1'

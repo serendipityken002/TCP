@@ -47,11 +47,13 @@ def send_file(server):
         # 发送文件md5码
         file_md5 = calculate_md5(vedio_path)
         server.send(file_md5.encode('utf-8'))
-        print(f'文件 MD5 值发送成功：{file_md5}')
 
         # 接收服务器回应，校验文件完整性
-        op = server.recv(128)
-        print(op)
+        op = server.recv(128).decode('utf-8')
+        if op == 'true':
+            print('经md5核验文件准确无误')
+        else:
+            print('经md5核验文件有误，建议重新发送')
 
 def main():
     # 定义服务器IP和端口
