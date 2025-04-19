@@ -36,17 +36,17 @@ def send_file(server):
         server.send(filehead)
         print('文件头部信息发送成功')
         
+        # 发送文件md5码
+        file_md5 = calculate_md5(vedio_path)
+        server.send(file_md5.encode('utf-8'))
+
         # 获取断点位置
-        checkpoint = int(server.recv(8).decode('utf-8'))
+        checkpoint = int(server.recv(128).decode('utf-8'))
         print(f'服务器已接收 {checkpoint} 字节，继续传输')
 
         # 发送文件内容
         send_data(vedio_path, server, checkpoint)
         print('文件内容发送成功')
-
-        # 发送文件md5码
-        file_md5 = calculate_md5(vedio_path)
-        server.send(file_md5.encode('utf-8'))
 
         # 接收服务器回应，校验文件完整性
         op = server.recv(128).decode('utf-8')
