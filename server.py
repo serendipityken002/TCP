@@ -3,6 +3,11 @@ import os
 import threading
 import struct
 import hashlib
+import subprocess
+import yaml
+
+with open('config.yaml', 'r') as f:
+    config = yaml.safe_load(f)
 
 def calculate_md5(file_path):
     """计算文件的 MD5 值"""
@@ -75,12 +80,32 @@ def handle_client(conn):
         conn.close()
         print("连接已关闭")
 
+def online_play(conn):
+    process = subprocess.Popen(
+        ['ffplay', '-i', 'pipe:0', '-fs', '-autoexit'],  # 从标准输入播放
+        stdin=subprocess.PIPE
+    )
+
+    try:
+        while True:
+            data = conn.recv(1024)
+            if not data:
+                break
+            process.stdin.write(data)  # 将数据写入ffplay的标准输入
+    except Exception as e:
+        print(f"播放异常: {e}")
+    finally:
+        process.stdin.close()
+        process.wait()
+        conn.close()
+        print("连接已关闭")
+
 def main():
-    ip = '127.0.0.1'
-    port = 8080
+    ip = config['server']['ip']
+    port = config['server']['port']
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((ip, port))
-    server.listen(3)
+    server.listen(config['server']['max_connections'])
     print(f"INFO:服务端已启动 {ip}:{port}")
     if not os.path.exists('download'):
         os.makedirs('download')
@@ -90,7 +115,10 @@ def main():
             # 等待连接
             conn, addr = server.accept()
             print(f"客户端已连接: {addr}")
-            threading.Thread(target=handle_client, args=(conn,)).start()
+            if config['play']:
+                threading.Thread(target=online_play, args=(conn,)).start()
+            else:
+                threading.Thread(target=handle_client, args=(conn,)).start()
         except socket.error as e:
             print(f"ERROR: {e}")
             continue
